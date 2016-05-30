@@ -1,5 +1,7 @@
 #include <string>
 #include <map>
+#include <vector>
+#include <tuple>
 
 using namespace std;
 
@@ -12,11 +14,15 @@ class Node {
 		static map<Node *, double> max_weights; // Stores the maximum weight below a node, for each node
 
 	public:
+		// Static functions
+
 		static double get_max_weight(Node *);
 
 		static void set_max_weight(Node *, double);
 
 		static void remove_max_weight(Node *);
+
+		// Constructors
 
 		Node(void);
 
@@ -25,6 +31,8 @@ class Node {
 		Node(bool, double);
 
 		Node(const Node &);
+
+		// Getters
 
 		bool is_end(void) const;
 
@@ -37,15 +45,17 @@ class Node {
 
 		map<char, Node *> get_children(void) const;
 
-		int hash(void) const;
-
 		bool contains_key(char) const;
+
+		// Setters
 
 		void set_child(char, Node *);
 
 		void set_end(bool);
 
 		void set_weight(double);
+
+		// Functionality
 
 		bool insert(const string word, double);
 
@@ -56,15 +66,24 @@ class Node {
 		/* Function to recursively get weight in trie below this node. */
 		double get_weight(const string word) const;
 
-		bool operator <(const Node &) const;
+		void update_weight(const string, double (*)(double));
+
+		// Other
 
 		Node operator =(const Node &);
+
+		~Node(void);
 };
 
 ostream& operator <<(ostream &, const Node &);
 
 class Trie {
 	private:
+		static void autocorrect_helper(vector<tuple<string, double, int>> *, string, Node *, string, char, int *, int);
+
+		static vector<string> rank_suggestions(string, vector<tuple<string, double, int>>);
+
+		static vector<string> rank_suggestions_by_keyboard_proximity(string, vector<string>);
 
 	public:
 		Node root; // Top of trie.
@@ -74,12 +93,17 @@ class Trie {
 
 		bool insert(const string, double);
 
+		void insert_from_file(const string, bool = false, const char * = " \n\t");
+
+		void insert_from_raw_text(const string);
+
 		bool contains(const string);
 
 		bool remove(const string);
 
 		double get_weight(const string);
 
-		string * autocomplete(const string, int);
+		vector<string> autocomplete(const string, int);
 
+		vector<string> autocorrect(const string, int);
 };

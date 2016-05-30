@@ -6,20 +6,31 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-	string dictionary_path = "../data/Default_dictionary";
+	string dictionary_path = "../data/Default_dictionary.txt";
+	string wiktionary_path = "../data/wiktionary.txt";
 
-	Node root;
+	Trie t;
 
-	root.insert("smog", 5.0);
-	root.insert("buck", 10.0);
-	root.insert("sad", 12.0);
-	root.insert("spite", 20.0);
-	root.insert("spit", 15.0);
-	root.insert("spy", 7.0);
+	cout << "Reading dictionary... ";
+	t.insert_from_file(wiktionary_path, true);
+	cout << "Done." << endl;
 
-	cout << Node::get_max_weight(&root) << endl;
-	root.remove("spite");
-	cout << Node::get_max_weight(&root) << endl;
+	// string input;
+	// while (true) {
+	// 	cout << "Enter word: ";
+	// 	cin >> input;
+
+	// 	for (string s : t.autocorrect(input, 1)) {
+	// 		cout << "\t" << s << endl;
+	// 	}
+	// }
+
+	cout << "Suggestions: " << endl;
+	for (string s : t.autocorrect("thier", 2)) {
+		cout << "\t" << s << endl;
+	}
+
+	// t.autocorrect("thier", 1);
 
 	return 0;
 }

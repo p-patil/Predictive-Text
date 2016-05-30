@@ -1,9 +1,14 @@
 #include <string>
+#include <cstring>
 #include <map>
 #include <limits>
 #include <sstream>
-#include <cstdlib>
 #include <exception>
+#include <queue>
+#include <vector>
+#include <fstream>
+#include <algorithm>
+#include <tuple>
 #include <iostream>
 #include "trie.h"
 
@@ -55,25 +60,6 @@ Node * Node::get_child(char c) const {
 }
 
 map<char, Node *> Node::get_children(void) const { return this->children; }
-
-/* Hash function for a node. */
-int Node::hash(void) const { 
-	stringstream s;
-	for (char c = 0; c < (1 << sizeof(char)); c++) { // Iterate over all possible chars
-		if (this->contains_key(c)) {
-			s << ((int) c);
-		}
-	}
-
-	int h;
-	s >> h;
-
-	if (this->is_end()) {
-		h *= this->get_weight();
-	}
-
-	return h;
-}
 
 void Node::set_child(char c, Node *n) { this->children[c] = n; }
 
@@ -163,6 +149,7 @@ bool Node::remove(const string word) {
 			}
 		} else {
 			this->get_child(word[0])->set_end(false);
+			Node::remove_max_weight(this->get_child(word[0]));
 		}
 
 		return true;
@@ -199,7 +186,7 @@ bool Node::remove(const string word) {
 			}
 		}
 
-		Node::set_max_weight(this, temp);
+		Node::set_max_weight(this, best);
 	}
 
 	return ret;
@@ -216,7 +203,16 @@ double Node::get_weight(const string word) const {
 	return this->get_child(word[0])->get_weight(word.substr(1));
 }
 
-bool Node::operator <(const Node &n) const { return this->hash() > n.hash(); }
+/* Given a weight update function, updates the weight of the given word in the trie beneath this node. */
+void Node::update_weight(const string word, double (*update_function)(double)) {
+	/* Base case. */
+	if (word.length() == 1) {
+		double old_weight = this->get_child(word[0])->get_weight();
+		this->get_child(word[0])->set_weight(update_function(old_weight));
+	} else {
+		this->get_child(word[0])->update_weight(word.substr(1), update_function);
+	}
+}
 
 Node Node::operator =(const Node &n) {
 	if (this != &n) { // Guard against self assignment.
@@ -228,10 +224,12 @@ Node Node::operator =(const Node &n) {
 	return *this;
 }
 
+Node::~Node(void) { this->children.~map(); }
+
 /* End Node class. */
 
 ostream& operator <<(ostream &stream, const Node &n) {
-	stream << "Node " << n.hash() << "\n";
+	stream << "Node\n";
 	
 	stream << "\tEnd of word: ";
 	if (n.is_end()) {
@@ -259,15 +257,185 @@ bool Trie::insert(const string word) { return this->root.insert(word, 0); }
 
 bool Trie::insert(const string word, double weight) { return this->root.insert(word, weight); }
 
+/* Inserts words from a given file into this trie. Uses given weights if the boolean flag is true.
+ * Expected format: First line contains number of words, then one word per line. If weights are 
+ * included, weight of word expected on same line as word, separated by whitespace. */
+void Trie::insert_from_file(const string filepath, bool has_weights /* = false */, const char *delims /* = " \n\t" */) {
+	ifstream dict (filepath);
+	string line; // Current line of file
+	char *word, *weight_str; // Parsed word and weight
+	double weight = 0.0;
+
+	getline(dict, line); // Skip first line which contains number of words
+	while (getline(dict, line)) {
+		word = strtok((char *) line.c_str(), delims);
+
+		if (has_weights) { // Retrieve the weight
+			weight_str = strtok(NULL, delims);
+			weight = atoi(weight_str);
+		}
+
+		this->insert(word, weight);
+	}
+
+	dict.close();
+}
+
+void Trie::insert_from_raw_text(const string filepath) {
+
+}
+
 bool Trie::contains(const string word) { return this->root.contains(word); }
 
 bool Trie::remove(const string word) { return this->root.remove(word); }
 
 double Trie::get_weight(const string word) { return this->root.get_weight(word); }
 
-/* Returns the top k matches, in order, in this Trie which complete the given prefix. */
-// string * autocomplete(const string prefix, int k) {
+/* Returns the top k matches, ordered by weight, in this Trie which complete the given prefix. */
+vector<string> Trie::autocomplete(const string prefix, int k) {
+	/* First, iterate down to the node at the end of prefix. */
+	Node *initial = &(this->root);
+	for (int i = 0; i < prefix.length(); ++i) {
+		initial = initial->get_child(prefix[i]);
+	}
 
-// }
+	/* Initialize priority queue which orders nodes by maximum weight below a given node, for use in modified Dijkstra's 
+	 * algorithm below. */
+	class NodeComparator {
+		public:
+			bool operator () (Node *n1, Node *n2) { return Node::get_max_weight(n1) < Node::get_max_weight(n2); }		
+	};
+	priority_queue<Node *, vector<Node *>, NodeComparator> queue;
+	map<Node *, string> words;
+	vector<string> ret;
+
+	/* Main loop of the algorithm - at each iteration, pop the node with the highest maximum weight from the priority queue,
+	 * and push the node's children to the priority queue. If the node is the end of a word and its max weight matches its
+	 * own weight, add it to ret. */
+	Node *curr;
+	words[initial] = prefix;
+	queue.push(initial);
+	while (!queue.empty() && ret.size() < k) {
+		// Pop the highest-max-weight element
+		curr = queue.top();
+		queue.pop();
+
+		// If appropriate add to ret
+		if (curr->is_end() && Node::get_max_weight(curr) == curr->get_weight()) {
+			ret.push_back(words[curr]);
+		}
+
+		// Add children to queue
+		for (auto const &it : curr->get_children()) {
+			words[it.second] = words[curr] + it.first;
+			queue.push(it.second);
+		}
+	}
+
+	return ret;
+}
+
+/* Returns the top k matches, ordered by a combination of Levenshtein distance and word weight, which autocorrect the 
+ * given word. */
+vector<string> Trie::autocorrect(const string word, int max_distance) {
+	int first_row[word.length() + 1];
+	for (int i = 0; i < word.length() + 1; ++i) {
+		first_row[i] = i;
+	}
+
+	vector<tuple<string, double, int>> suggestions;
+	for (const auto &it : this->root.get_children()) {
+		this->autocorrect_helper(&suggestions, word, it.second, "", it.first, first_row, max_distance);
+	}
+
+	// No need to free first_row; autocorrect_helper will free it
+	return rank_suggestions(word, suggestions);
+}
+
+/* Private helper function. Given a node and the key the parent maps to the node, uses the previous row of
+   the Levenshtein distance dynamic programming algorithm's table to build the current row in order tostore all
+   the words in the trie whose Levensthein distance to the given (possibly misspelled) word which are within the
+   specified threshold. */
+void Trie::autocorrect_helper(vector<tuple<string, double, int>> *v, string word, Node *n, string curr_word, char letter, int *prev_row, int max_distance) {
+	int num_columns = word.length() + 1;
+	int *curr_row = new int[num_columns]; // Allocate to heap since recursion depth may be very large
+
+	/* Build the next row of the Levenshtein distance table. The DP algorithm is based on the recurrence relation
+	 *     L(i, j) = min(L(i - 1, j) + 1, L(i, j - 1) + 1, L(i - 1, j - 1) + I(s[i - 1] == t[j - 1]))
+	 * where, given strings s, t, L(i, j) = Levenshtein distance between substrings s[0 : i], t[0 : j] and 
+	 * I(a == b) := 0 if (a == b) and 1 if not. */
+	curr_row[0] = prev_row[0] + 1;
+	int min_dist = curr_row[0];
+	int insert_cost, delete_cost, substitute_cost;
+	for (int i = 1; i < num_columns; ++i) {
+		insert_cost = curr_row[i - 1] + 1;
+		delete_cost = prev_row[i] + 1;
+		substitute_cost = prev_row[i - 1] + (word[i - 1] == letter ? 0 : 1);
+
+		curr_row[i] = min(min(insert_cost, delete_cost), substitute_cost);
+
+		if (curr_row[i] < min_dist) {
+			min_dist = curr_row[i];
+		}
+	}
+
+	 /* If the current node is the end of a word, and its Levensthein distance is within the threshold, add it. */
+	if (n->is_end() && curr_row[num_columns - 1] <= max_distance) {
+		v->push_back(make_tuple(curr_word + letter, n->get_weight(), curr_row[num_columns - 1]));
+	}
+
+	/* If there are nodes below this node with distance within the threshold, recursively add them. */
+	if (min_dist <= max_distance) {
+		for (const auto &it : n->get_children()) {
+			autocorrect_helper(v, word, it.second, curr_word + letter, it.first, curr_row, max_distance);
+		}
+	}
+
+	delete[] curr_row;
+}
+
+// TODO: When ranking, account for QWERTY keyboard proximity, so misspellings where the correct letter is close to the
+// estimated correct spelling's letter on a QWERTY keyboard are ranked higher.
+/* Ranks first by distances, then by weights. */
+vector<string> Trie::rank_suggestions(string word, vector<tuple<string, double, int>> suggestions) {
+	// First sort by Levenshtein distance, then by weight.
+	map<int, map<double, vector<string>>> m;
+
+	string word;
+	double weight;
+	int dist;
+	for (tuple<string, double, int> t : suggestions) {
+		word = get<0>(t);
+		weight = get<1>(t);
+		dist = get<2>(t);
+
+		/* If m doesn't contain the key dist, initialize. */
+		if (m.find(dist) == m.end()) {
+			m[dist] = map<double, vector<string>>();
+		}
+
+		/* If m[dist] doesn't contain the key weight, initialize. */
+		if (m[dist].find(weight) == m[dist].end()) {
+			m[dist][weight] = vector<string>();			
+		}
+
+		m[dist][weight].push_back(word);
+	}
+
+	vector<string> ret;
+	for (map<int, map<double, vector<string>>>::iterator it1 = m.begin(); it1 != m.end(); ++it1) {
+		for (map<double, vector<string>>::iterator it2 = it1->second.begin(); it2 != it1->second.end(); ++it2) {
+			for (string s : rank_suggestions_by_keyboard_proximity(word, it2->second)) {
+				ret.push_back(s);				
+			}
+		}
+	}
+
+	return ret;
+}
+
+vector<string> Trie::rank_suggestions_by_keyboard_proximity(string word, vector<string> suggestions) {
+	
+}
 
 /* End Trie class. */
