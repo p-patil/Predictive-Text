@@ -1,7 +1,11 @@
+#ifndef TRIE_H
+#define TRIE_H
+
 #include <string>
 #include <map>
 #include <vector>
 #include <tuple>
+#include <utility>
 
 using namespace std;
 
@@ -79,11 +83,15 @@ ostream& operator <<(ostream &, const Node &);
 
 class Trie {
 	private:
+		static int levenschtein_distance(string, string);
+
 		static void autocorrect_helper(vector<tuple<string, double, int>> *, string, Node *, string, char, int *, int);
 
-		static vector<string> rank_suggestions(string, vector<tuple<string, double, int>>);
+		static vector<string> rank_suggestions(const string, vector<tuple<string, double, int>>);
 
-		static vector<string> rank_suggestions_by_keyboard_proximity(string, vector<string>);
+		static vector<string> rank_suggestions_by_keyboard_proximity(const string, vector<string>);
+
+		static double increment_weight(double);
 
 	public:
 		Node root; // Top of trie.
@@ -107,3 +115,5 @@ class Trie {
 
 		vector<string> autocorrect(const string, int);
 };
+
+#endif

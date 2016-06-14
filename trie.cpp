@@ -9,7 +9,7 @@
 #include <fstream>
 #include <algorithm>
 #include <tuple>
-#include <iostream>
+#include <utility>
 #include "trie.h"
 
 /* Begin Node class. */
@@ -200,7 +200,11 @@ double Node::get_weight(const string word) const {
 	}
 
 	/* Recursively search the child. */
-	return this->get_child(word[0])->get_weight(word.substr(1));
+	if (this->contains_key(word[0])) {
+		return this->get_child(word[0])->get_weight(word.substr(1));
+	} else {
+		return -1;
+	}
 }
 
 /* Given a weight update function, updates the weight of the given word in the trie beneath this node. */
@@ -257,6 +261,29 @@ bool Trie::insert(const string word) { return this->root.insert(word, 0); }
 
 bool Trie::insert(const string word, double weight) { return this->root.insert(word, weight); }
 
+int Trie::levenschtein_distance(string s, string t) {
+	int dist[s.length() + 1][t.length() + 1];
+	for (int i = 0; i < s.length() + 1; ++i) {
+		dist[i][0] = i;
+	}
+	for (int j = 0; j < t.length() + 1; ++j) {
+		dist[0][j] = j;
+	}
+
+	int increment_weight, delete_cost, substitute_cost;
+	for (int i = 1; i < s.length() + 1; ++i) {
+		for (int j = 1; j < t.length() + 1; ++j) {
+			increment_weight = dist[i - 1][j] + 1;
+			delete_cost = dist[i][j - 1] + 1;
+			substitute_cost = dist[i - 1][j - 1] + ((s[i - 1] == t[j - 1]) ? 0 : 1);
+
+			dist[i][j] = min(min(increment_weight, delete_cost), substitute_cost);
+		}
+	}
+
+	return dist[s.length()][t.length()];
+}
+
 /* Inserts words from a given file into this trie. Uses given weights if the boolean flag is true.
  * Expected format: First line contains number of words, then one word per line. If weights are 
  * included, weight of word expected on same line as word, separated by whitespace. */
@@ -282,8 +309,28 @@ void Trie::insert_from_file(const string filepath, bool has_weights /* = false *
 }
 
 void Trie::insert_from_raw_text(const string filepath) {
+	ifstream words (filepath);
+	string line; // Current line of file
+	char *word, *weight_str; // Parsed word and weight
+	double weight = 0.0;
 
+	while (getline(words, line)) {
+		word = strtok((char *) line.c_str(),  "\n\t");
+
+		while (word != NULL) {
+			if (this->contains(word)) {
+				this->root.update_weight(word, increment_weight);
+			} else {
+				this->insert(word, 0.0);
+			}
+			word = strtok(NULL,  "\n\t");
+		}
+	}
+
+	words.close();
 }
+
+double Trie::increment_weight(double weight) { return weight + 1; }
 
 bool Trie::contains(const string word) { return this->root.contains(word); }
 
@@ -394,18 +441,16 @@ void Trie::autocorrect_helper(vector<tuple<string, double, int>> *v, string word
 	delete[] curr_row;
 }
 
-// TODO: When ranking, account for QWERTY keyboard proximity, so misspellings where the correct letter is close to the
-// estimated correct spelling's letter on a QWERTY keyboard are ranked higher.
 /* Ranks first by distances, then by weights. */
 vector<string> Trie::rank_suggestions(string word, vector<tuple<string, double, int>> suggestions) {
 	// First sort by Levenshtein distance, then by weight.
 	map<int, map<double, vector<string>>> m;
 
-	string word;
+	string suggestion;
 	double weight;
 	int dist;
 	for (tuple<string, double, int> t : suggestions) {
-		word = get<0>(t);
+		suggestion = get<0>(t);
 		weight = get<1>(t);
 		dist = get<2>(t);
 
@@ -419,23 +464,19 @@ vector<string> Trie::rank_suggestions(string word, vector<tuple<string, double, 
 			m[dist][weight] = vector<string>();			
 		}
 
-		m[dist][weight].push_back(word);
+		m[dist][weight].push_back(suggestion);
 	}
 
 	vector<string> ret;
 	for (map<int, map<double, vector<string>>>::iterator it1 = m.begin(); it1 != m.end(); ++it1) {
 		for (map<double, vector<string>>::iterator it2 = it1->second.begin(); it2 != it1->second.end(); ++it2) {
-			for (string s : rank_suggestions_by_keyboard_proximity(word, it2->second)) {
+			for (string s : it2->second) {
 				ret.push_back(s);				
 			}
 		}
 	}
 
 	return ret;
-}
-
-vector<string> Trie::rank_suggestions_by_keyboard_proximity(string word, vector<string> suggestions) {
-	
 }
 
 /* End Trie class. */
