@@ -2,6 +2,7 @@
 #include <cmath>
 #include <iterator>
 #include <algorithm>
+#include <iostream>
 #include "neural_network.h"
 
 using namespace std;
@@ -210,7 +211,7 @@ void NeuralNetwork::add_arrays(ARRAY_3D &arr, const ARRAY_3D &summand) {
 }
 
 /* Sigmoid activation function. */
-double NeuralNetwork::activation_function(double x) { return 1 / (1 + exp(-x)); }
+double NeuralNetwork::activation_function(double x) { return 1.0 / (1.0 + exp(-x)); }
 
 /* Derivative of the activation function given an input. */
 double NeuralNetwork::activation_function_derivative_input(double x) {
@@ -219,7 +220,7 @@ double NeuralNetwork::activation_function_derivative_input(double x) {
 }
 
 /* Derivative of the activation function given an output. */
-double NeuralNetwork::activation_function_derivative_output(double y) { return y * (1 - y); }
+double NeuralNetwork::activation_function_derivative_output(double y) { return y * (1.0 - y); }
 
 /* Error function used in training: error(x, y) = 1/2 * (mag(x - y)^2) for vectors x, y. */
 double NeuralNetwork::error_function(const ARRAY &output, const ARRAY &expected, int length) {
@@ -232,14 +233,15 @@ double NeuralNetwork::error_function(const ARRAY &output, const ARRAY &expected,
 	return squared_magnitude / 2;
 }
 
-/* Given an actual output and expected output, returns all the deltas (one per non-output neuron) according to the delta rule. */
+/* Given an actual output and expected output, returns all the deltas (one per non-output neuron) according to the delta rule. 
+ * The returned array's indices are shifted backwards by 1, so that ret[i] represents layer (i + 1) of this neural network. */
 ARRAY_2D NeuralNetwork::backpropagate(const ARRAY &output, const ARRAY &expected, const ARRAY_2D &neuron_outputs) const {
-	int length = this->get_num_layers() - 1;
+	int length = this->get_num_layers();
 	ARRAY_2D deltas (length);
 
 	/* Initialize data for output layer. */
 	deltas[length - 1] = ARRAY(this->get_layer_count(this->get_num_layers() - 1));
-	for (int i = 0; i < this->get_layer_count(this->get_num_layers() - 1); ++i) {
+	for (int i = 0; i < deltas[length - 1].size(); ++i) {
 		deltas[length - 1][i] = activation_function_derivative_output(output[i]) * (output[i] - expected[i]);
 	}
 
@@ -260,10 +262,12 @@ ARRAY_2D NeuralNetwork::backpropagate(const ARRAY &output, const ARRAY &expected
 		}
 	}
 
+	/* Input neurons have no associated delta value, so delta[0] is never set. */
+
 	return deltas;
 }
 
-ARRAY_3D NeuralNetwork::compute_derivatives(const ARRAY_2D &outputs, const ARRAY_2D &deltas) {
+ARRAY_3D NeuralNetwork::compute_derivatives(const ARRAY_2D &outputs, const ARRAY_2D &deltas) const {
 	ARRAY_3D derivatives (this->get_num_layers() - 1);
 
 	for (int i = 0; i < this->get_num_layers() - 1; ++i) {
@@ -272,7 +276,7 @@ ARRAY_3D NeuralNetwork::compute_derivatives(const ARRAY_2D &outputs, const ARRAY
 		for (int j = 0; j < this->get_layer_count(i); ++j) {
 			derivatives[i][j] = ARRAY(this->get_layer_count(i + 1));
 
-			for (int k = 0; i < this->get_layer_count(i + 1); ++k) {
+			for (int k = 0; k < this->get_layer_count(i + 1); ++k) {
 				derivatives[i][j][k] = deltas[i + 1][k] * outputs[i][j];
 			}
 		}
@@ -281,11 +285,11 @@ ARRAY_3D NeuralNetwork::compute_derivatives(const ARRAY_2D &outputs, const ARRAY
 	return derivatives;
 }
 
-ARRAY_2D NeuralNetwork::compute_bias_derivatives(const ARRAY_2D &deltas) {
+ARRAY_2D NeuralNetwork::compute_bias_derivatives(const ARRAY_2D &deltas) const {
 	ARRAY_2D bias_derivatives (this->get_num_layers() - 1);
 
 	for (int i = 0; i < this->get_num_layers() - 1; ++i) {
-		bias_derivatives[i] = ARRAY (this->get_layer_count(i + 1));
+		bias_derivatives[i] = ARRAY(this->get_layer_count(i + 1));
 
 		for (int j = 0; j < this->get_layer_count(i + 1); ++j) {
 			bias_derivatives[i][j] = deltas[i + 1][j]; // output of bias neurons is always 1
@@ -322,53 +326,70 @@ void NeuralNetwork::update_bias_weights(const ARRAY_2D &bias_gradient, double le
 	}
 }
 
-// void NeuralNetwork::gradient_descent(vector<pair<const ARRAY &, const ARRAY &>> samples) {
-void NeuralNetwork::gradient_descent(const vector<pair<ARRAY, ARRAY>> &samples) {
-	random_shuffle(samples.begin(), samples.end()); // Shuffle so batches are random
+/* Given a training batch fills the given arrays with the sums of all derivatives of the error function with respect to each weight. */
+pair<ARRAY_3D, ARRAY_2D> NeuralNetwork::gradient_descent(pair<ARRAY, ARRAY> *batch, int batch_size)	 const {
+	ARRAY output, expected;
+	ARRAY_2D avg_bias_derivatives = ARRAY_2D(this->get_num_layers() - 1);
+	ARRAY_3D avg_derivatives = ARRAY_3D(this->get_num_layers() - 1);
 
-	/* Initialize array to keep track of sum of all error function gradients per batch. */
-	ARRAY_3D derivatives_sums = ARRAY_3D(this->get_num_layers() - 1);
-	ARRAY_2D bias_derivatives_sums = ARRAY_2D(this->get_num_layers() - 1);
+	/* Initialize the arrays that store the average derivatives. */
 	for (int i = 0; i < this->get_num_layers() - 1; ++i) {
-		derivatives_sums[i] = ARRAY_2D(this->get_layer_count(i));
+		avg_derivatives[i] = ARRAY_2D(this->get_layer_count(i));
 
 		for (int j = 0; j < this->get_layer_count(i); ++j) {
-			derivatives_sums[i][j] = ARRAY(this->get_layer_count(i + 1));
-		}
+		avg_derivatives[i][j] = ARRAY(this->get_layer_count(i + 1));
 
-		bias_derivatives_sums[i] = ARRAY(this->get_layer_count(i + 1));
+			for (int k = 0; k < this->get_layer_count(i + 1); ++k) {
+				avg_derivatives[i][j][k] = 0.0;
+			}
+		}
 	}
 
-	ARRAY output, expected;
+	for (int i = 0; i < this->get_num_layers() - 1; ++i) {
+		avg_bias_derivatives[i] = ARRAY(this->get_layer_count(i));
+
+		for (int j = 0; j < this->get_layer_count(i); ++j) {
+			avg_bias_derivatives[i][j] = 0.0;
+		}
+	}
+
+	/* Sum all the error function gradients for (input, output) pairs in this batch. */
 	ARRAY_2D neuron_outputs, deltas, bias_derivatives;
 	ARRAY_3D derivatives;
-	for (int i = 0; i < samples.size(); i += NeuralNetwork::batch_size) {
-		/* Reset sums. */
-		NeuralNetwork::set_zero(derivatives_sums);
-		NeuralNetwork::set_zero(bias_derivatives_sums);
+	for (int i = 0; i < batch_size; ++i) {
+		neuron_outputs = this->feedforward_and_get_outputs(get<0>(batch[i]));
+		output = neuron_outputs[this->get_num_layers() - 1];
+		expected = get<1>(batch[i]);
 
-		/* Sum all the error function gradients for (input, output) pairs in this batch. */
-		for (int j = i; j < NeuralNetwork::batch_size; ++j) {
-			neuron_outputs = this->feedforward_and_get_outputs(get<0>(samples[j]));
-			output = neuron_outputs[this->get_num_layers() - 1];
-			expected = get<1>(samples[j]);
+		/* Backpropagate to compute deltas. */
+		deltas = this->backpropagate(output, expected, neuron_outputs);
 
-			/* Backpropagate to compute deltas. */
-			deltas = this->backpropagate(output, expected, neuron_outputs);
+		/* Compute the gradients. */
+		derivatives = this->compute_derivatives(neuron_outputs, deltas);
+		bias_derivatives = this->compute_bias_derivatives(deltas); // No need to pass bias outputs since they're always 1
 
-			/* Compute the gradients. */
-			derivatives = this->compute_derivatives(neuron_outputs, deltas);
-			bias_derivatives = this->compute_bias_derivatives(deltas); // No need to pass bias outputs since they're always 1
-
-			/* Add to running total. */
-			NeuralNetwork::add_arrays(derivatives_sums, derivatives);
-			NeuralNetwork::add_arrays(bias_derivatives_sums, bias_derivatives);
-		}
-
-		/* Update weights using gradient. */
-		this->update_weights(derivatives_sums, NeuralNetwork::learning_rate);
-		this->update_bias_weights(bias_derivatives_sums, NeuralNetwork::learning_rate);
+		/* Add to running total. */
+		NeuralNetwork::add_arrays(avg_derivatives, derivatives);
+		NeuralNetwork::add_arrays(avg_bias_derivatives, bias_derivatives);
 	}
+
+
+	/* Normalize the derivative sums to get the average. */
+	for (int i = 0; i < avg_derivatives.size(); ++i) {
+		for (int j = 0; j < avg_derivatives[i].size(); ++j) {
+			for (int k = 0; k < avg_derivatives[i][j].size(); ++k) {
+				avg_derivatives[i][j][k] /= batch_size;
+			}
+		}
+	}
+
+	for (int i = 0; i < avg_bias_derivatives.size(); ++i) {
+		for (int j = 0; j < avg_bias_derivatives[i].size(); ++j) {
+			avg_bias_derivatives[i][j] /= batch_size;
+		}
+	}
+
+	return make_pair(avg_derivatives, avg_bias_derivatives);
 }
 
 // Getters
@@ -438,6 +459,25 @@ ARRAY_2D NeuralNetwork::feedforward_and_get_outputs(const ARRAY &inputs) const {
 	return outputs;
 }
 
+/* Trains this neural network on the given data. */
+void NeuralNetwork::train(vector<pair<ARRAY, ARRAY>> samples) {
+	random_shuffle(samples.begin(), samples.end()); // Shuffle so batches are random
+	pair<ARRAY_3D, ARRAY_2D> p;
+	ARRAY_3D avg_derivative;
+	ARRAY_2D avg_bias_derivative;
+
+	for (int i = 0; i < samples.size(); i += NeuralNetwork::batch_size) {
+		/* Perform gradient descent on the batch to get the sum of derivatives. */
+		p = this->gradient_descent(&samples[0] + i, NeuralNetwork::batch_size);
+		avg_derivative = get<0>(p);
+		avg_bias_derivative = get<1>(p);
+
+		/* Update weights using gradient. */
+		this->update_weights(avg_derivative, NeuralNetwork::learning_rate);
+		this->update_bias_weights(avg_bias_derivative, NeuralNetwork::learning_rate);
+	}
+}
+
 /* Destructor. */
 NeuralNetwork::~NeuralNetwork(void) {
 	for (int i = 0; i < this->get_num_layers(); ++i) {
@@ -455,34 +495,5 @@ NeuralNetwork::~NeuralNetwork(void) {
 	delete[] this->bias_neurons;
 	delete[] this->layer_counts;
 }
-
-// ostream& operator <<(ostream &stream, const NeuralNetwork &network) {
-// 	for (int i = 0; i < network.get_num_layers() - 1; i++) {
-// 		if (i == 0) {
-// 			stream << "INPUT LAYER\n";
-// 		} else {
-// 			stream << "LAYER " << i << endl;
-// 		}
-
-// 		stream << "\tBias Neuron - Weights:\n";
-// 		for (int j = 0; j < network.get_layer_count(i + 1); j++) {
-// 			stream << "\t\tNeuron " << j + ": " << network.get_bias_neuron(i)->get_weight(j) << endl;
-// 		}
-
-// 		for (int j = 0; j <  network.get_layer_count(i); j++) {
-// 			stream << "\tNeuron " << j << " - Weights:\n";
-// 			for (int k = 0; k < network.get_layer_count(i + 1); k++) {
-// 				stream << "\t\tNeuron " << k << ": " << network.get_neuron(i, j)->get_weight(k) << endl;
-// 			}
-// 		}
-// 	}
-
-// 	stream << "OUTPUT LAYER\n";
-// 	for (int j = 0; j < network.get_layer_count(network.get_num_layers() - 1); j++) {
-// 		stream << "\tOutput Neuron " << j;
-// 	}
-
-// 	return stream;
-// }
 
 /* End NeuralNetwork class. */

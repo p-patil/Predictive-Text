@@ -4,12 +4,16 @@
 #include <cstring>
 #include <dirent.h>
 #include <utility>
+#include <cmath>
+#include <random>
 #include "trie.h"
 #include "ngram.h"
 #include "sentence_disambiguation.h"
 #include "neural_network.h"
 
 using namespace std;
+
+#define PI 3.141592653589793238462643383279502884197169399375105820974
 
 /* TODO:
 	1. n-gram prediction
@@ -48,12 +52,65 @@ int main(int argc, char **argv) {
 	// 	}
 	// }
 
-	// PartOfSpeechTagger tagger;
-	// tagger.read_brown_corpus("../data/brown");
+	// // default_random_engine generator;
+	// // uniform_real_distribution<double> distribution(0, 2 * PI);
 
-	// for (double d : tagger.pos_frequencies("adult")) {
-	// 	cout << d << endl;
+	// // int sample_size = 10000;
+	// // vector<pair<ARRAY, ARRAY>> samples (sample_size);
+
+	// // double x, y;
+	// // for (int i = 0; i < sample_size; ++i) {
+	// // 	x = distribution(generator);
+	// // 	y = sin(x);
+
+	// // 	ARRAY x_arr, y_arr;
+	// // 	x_arr.push_back(x);
+	// // 	y_arr.push_back(y);
+
+	// // 	samples[i] = make_pair(x_arr, y_arr);
+	// // }
+
+	// // int layer_counts[] = {1, 3, 1};
+	// // NeuralNetwork net (layer_counts, 3);
+	// // net.train(samples);
+
+	// int test_size = 10;
+	// double yhat;
+	// for (int i = 0; i < test_size; ++i) {
+	// 	x = distribution(generator);
+	// 	y = sin(x);
+
+	// 	yhat = net.feedforward(ARRAY(1, x))[0];
+	// 	cout << "Error: " << abs(y - yhat) << endl;
 	// }
+
+	int num_layers = 3;
+	int layer_counts[] = {1, 1, 1};
+
+	double ***weights = new double **[num_layers - 1];
+	for (int i = 0; i < num_layers; ++i) {
+		weights[i] = new double *[layer_counts[i]];
+
+		for (int j = 0; j < layer_counts[i]; ++j) {
+			weights[i][j] = new double[layer_counts[i + 1]];
+
+			for (int k = 0; k < layer_counts[i + 1]; ++k) {
+				weights[i][j][k] = 1.0;
+			}
+		}
+	}
+
+	double **bias_weights = new double *[num_layers];
+	for (int i = 0; i < num_layers; ++i) {
+		bias_weights[i] = new double[layer_counts[i + 1]];
+
+		for (int j = 0; j < layer_counts[i + 1]; ++j) {
+			bias_weights[i][j] = 0.0;
+		}
+	}
+
+	NeuralNetwork net(layer_counts, weights, bias_weights, 3);
+	cout << net.feedforward(ARRAY(1, 1))[0] << endl;
 
 	return 0;
 }

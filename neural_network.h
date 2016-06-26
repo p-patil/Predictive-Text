@@ -77,7 +77,7 @@ class NeuralNetwork {
 	private:
 		static constexpr double learning_rate = 0.7;
 
-		static const int batch_size = 1;
+		static const int batch_size = 5;
 
 		// Getters and setters
 
@@ -119,16 +119,16 @@ class NeuralNetwork {
 
 		ARRAY_2D backpropagate(const ARRAY &, const ARRAY &, const ARRAY_2D &) const;
 		
-		ARRAY_3D compute_derivatives(const ARRAY_2D &, const ARRAY_2D &);
+		ARRAY_3D compute_derivatives(const ARRAY_2D &, const ARRAY_2D &) const;
 
-		ARRAY_2D compute_bias_derivatives(const ARRAY_2D &);
+		ARRAY_2D compute_bias_derivatives(const ARRAY_2D &) const;
 
 		void update_weights(const ARRAY_3D &, double);
 
 		void update_bias_weights(const ARRAY_2D &, double);
 
-		// void gradient_descent(vector<pair<const ARRAY &, const ARRAY &>>);
-		void gradient_descent(const vector<pair<ARRAY, ARRAY>> &);
+		pair<ARRAY_3D, ARRAY_2D> gradient_descent(pair<ARRAY, ARRAY> *, int) const;
+
 
 		ARRAY_2D feedforward_and_get_outputs(const ARRAY &) const;
 
@@ -148,6 +148,8 @@ class NeuralNetwork {
 		// Functionality
 
 		ARRAY feedforward(const ARRAY &) const;
+		
+		void train(vector<pair<ARRAY, ARRAY>>);
 		
 		// Other
 
