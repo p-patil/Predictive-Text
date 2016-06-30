@@ -6,6 +6,8 @@
 #include <utility>
 #include <cmath>
 #include <random>
+#include <algorithm>
+#include <functional>
 #include "trie.h"
 #include "ngram.h"
 #include "sentence_disambiguation.h"
@@ -32,6 +34,13 @@ using namespace std;
 				"direction"
 					- http://gizmodo.com/swiftkey-has-a-neural-network-keyboard-and-its-creepily-1735430695
 					- https://blog.swiftkey.com/neural-networks-a-meaningful-leap-for-mobile-typing/
+  Neural network TODO:
+    - Test on MNIST
+    - Incorporate momentum, adaptive learning rate, weight decay
+    - Learning optimal network topology
+    - Look into hyperparameter turning (eg grid search)
+    - Deep learning?
+
 */
 
 int main(int argc, char **argv) {
@@ -52,65 +61,35 @@ int main(int argc, char **argv) {
 	// 	}
 	// }
 
-	// // default_random_engine generator;
-	// // uniform_real_distribution<double> distribution(0, 2 * PI);
+        srand(time(NULL));
+	int sample_size = 1000;
+	vector<pair<ARRAY, ARRAY>> samples (sample_size);
 
-	// // int sample_size = 10000;
-	// // vector<pair<ARRAY, ARRAY>> samples (sample_size);
+	double x, y;
+	for (int i = 0; i < sample_size; ++i) {
+		x = ((double) rand()) / RAND_MAX;
+		y = sin(x);
 
-	// // double x, y;
-	// // for (int i = 0; i < sample_size; ++i) {
-	// // 	x = distribution(generator);
-	// // 	y = sin(x);
+		ARRAY x_arr, y_arr;
+		x_arr.push_back(x);
+		y_arr.push_back(y);
 
-	// // 	ARRAY x_arr, y_arr;
-	// // 	x_arr.push_back(x);
-	// // 	y_arr.push_back(y);
-
-	// // 	samples[i] = make_pair(x_arr, y_arr);
-	// // }
-
-	// // int layer_counts[] = {1, 3, 1};
-	// // NeuralNetwork net (layer_counts, 3);
-	// // net.train(samples);
-
-	// int test_size = 10;
-	// double yhat;
-	// for (int i = 0; i < test_size; ++i) {
-	// 	x = distribution(generator);
-	// 	y = sin(x);
-
-	// 	yhat = net.feedforward(ARRAY(1, x))[0];
-	// 	cout << "Error: " << abs(y - yhat) << endl;
-	// }
-
-	int num_layers = 3;
-	int layer_counts[] = {1, 1, 1};
-
-	double ***weights = new double **[num_layers - 1];
-	for (int i = 0; i < num_layers; ++i) {
-		weights[i] = new double *[layer_counts[i]];
-
-		for (int j = 0; j < layer_counts[i]; ++j) {
-			weights[i][j] = new double[layer_counts[i + 1]];
-
-			for (int k = 0; k < layer_counts[i + 1]; ++k) {
-				weights[i][j][k] = 1.0;
-			}
-		}
+		samples[i] = make_pair(x_arr, y_arr);
 	}
 
-	double **bias_weights = new double *[num_layers];
-	for (int i = 0; i < num_layers; ++i) {
-		bias_weights[i] = new double[layer_counts[i + 1]];
+	int layer_counts[] = {1, 3, 1};
+	NeuralNetwork net (layer_counts, 3);
+	net.train(samples, 10);
 
-		for (int j = 0; j < layer_counts[i + 1]; ++j) {
-			bias_weights[i][j] = 0.0;
-		}
+	int test_size = 10;
+	double yhat;
+	for (int i = 0; i < test_size; ++i) {
+		x = ((double) rand()) / RAND_MAX;
+		y = sin(x);
+
+		yhat = net.feedforward(ARRAY(1, x))[0];
+                cout << "Error: " << abs(y - yhat) << " - expected " << y << ", got " << yhat << endl;
 	}
-
-	NeuralNetwork net(layer_counts, weights, bias_weights, 3);
-	cout << net.feedforward(ARRAY(1, 1))[0] << endl;
-
+	
 	return 0;
 }

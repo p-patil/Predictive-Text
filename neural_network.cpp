@@ -21,13 +21,10 @@ Neuron::Neuron(Neuron **synapses, int length) {
 	this->num_synapses = length;
 	this->synapses = new Neuron * [length];
 	this->weights = new double[length];
-
-	default_random_engine generator;
-	uniform_real_distribution<double> distribution(-1.0, 1.0);
 	
 	for (int i = 0; i < length; ++i) {
 		this->synapses[i] = synapses[i];
-		this->weights[i] = distribution(generator);
+		this->weights[i] = 2 * (((double) rand()) / RAND_MAX) - 1;
 	}
 }
 
@@ -113,7 +110,9 @@ bool OutputNeuron::operator ==(const Neuron &n) { return n.is_output_neuron(); }
 
 /* End OutputNeuron class. */
 
-/* Begin NeuralNetwork class. */
+/* Begin NeuralNetwork class. Note: The implementation below makes use of the sigmoid activation function,
+ * whose range is [0, 1], and thus the resulting net is unable to output negative values. Thus, it's
+ * advised to normalize input vectors to [0, 1]^n before training. */
 
 /* Initializes a neural network, with random weights, whose i-th layer has layer_counts[i] neurons. */
 NeuralNetwork::NeuralNetwork(int *layer_counts, int length) {
@@ -460,22 +459,25 @@ ARRAY_2D NeuralNetwork::feedforward_and_get_outputs(const ARRAY &inputs) const {
 }
 
 /* Trains this neural network on the given data. */
-void NeuralNetwork::train(vector<pair<ARRAY, ARRAY>> samples) {
-	random_shuffle(samples.begin(), samples.end()); // Shuffle so batches are random
+void NeuralNetwork::train(vector<pair<ARRAY, ARRAY>> samples, int num_epochs /* = 1 */) {
 	pair<ARRAY_3D, ARRAY_2D> p;
 	ARRAY_3D avg_derivative;
 	ARRAY_2D avg_bias_derivative;
 
-	for (int i = 0; i < samples.size(); i += NeuralNetwork::batch_size) {
-		/* Perform gradient descent on the batch to get the sum of derivatives. */
-		p = this->gradient_descent(&samples[0] + i, NeuralNetwork::batch_size);
-		avg_derivative = get<0>(p);
-		avg_bias_derivative = get<1>(p);
+        for (int epoch = 0; epoch < num_epochs; ++epoch) {
+	    random_shuffle(samples.begin(), samples.end()); // Shuffle so batches are random
 
-		/* Update weights using gradient. */
-		this->update_weights(avg_derivative, NeuralNetwork::learning_rate);
-		this->update_bias_weights(avg_bias_derivative, NeuralNetwork::learning_rate);
-	}
+	    for (int i = 0; i < samples.size(); i += NeuralNetwork::batch_size) {
+	    	/* Perform gradient descent on the batch to get the sum of derivatives. */
+	    	p = this->gradient_descent(&samples[0] + i, NeuralNetwork::batch_size);
+	    	avg_derivative = get<0>(p);
+	    	avg_bias_derivative = get<1>(p);
+
+	    	/* Update weights using gradient. */
+	    	this->update_weights(avg_derivative, NeuralNetwork::learning_rate);
+	    	this->update_bias_weights(avg_bias_derivative, NeuralNetwork::learning_rate);
+	    }
+        }
 }
 
 /* Destructor. */

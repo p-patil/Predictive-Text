@@ -75,9 +75,9 @@ class OutputNeuron : public Neuron {
 
 class NeuralNetwork {
 	private:
-		static constexpr double learning_rate = 0.7;
+		static constexpr double learning_rate = 0.2;
 
-		static const int batch_size = 5;
+		static const int batch_size = 1;
 
 		// Getters and setters
 
@@ -149,7 +149,7 @@ class NeuralNetwork {
 
 		ARRAY feedforward(const ARRAY &) const;
 		
-		void train(vector<pair<ARRAY, ARRAY>>);
+		void train(vector<pair<ARRAY, ARRAY>>, int = 1);
 		
 		// Other
 
