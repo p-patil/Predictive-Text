@@ -180,8 +180,8 @@ class Sentence {
 		static const int k = 3; // k-context - the number of words of context surrounding an end-of-sentence punctuation mark to use
 		static const int descriptor_length = POS_LEN; // Length of descriptor array
 
-		static const int lower_threshold = 0.2; // If output of the neural net < lower_threshold then punctuation is not sentence boundary
-		static const int upper_threshold = 0.7; // If output of the neural net > upper_threshold then punctuation is sentence boundary
+		static constexpr double lower_threshold = 0.2; // If output of the neural net < lower_threshold then punctuation is not sentence boundary
+		static constexpr double upper_threshold = 0.7; // If output of the neural net > upper_threshold then punctuation is sentence boundary
 
 	public:
 		static vector<string> get_sentences(const string, NeuralNetwork);

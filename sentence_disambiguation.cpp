@@ -114,10 +114,10 @@ bool PartOfSpeechTagger::is_dir(const string filepath) {
 		} else if (s.st_mode & S_IFREG) { // filepath is a regular file
 			return false;
 		} else {
-			cout << "Found non-regular file at '" << filepath << "'\n";
+			throw runtime_error("Found non-regular file at '" + filepath + "'\n");
 		}
 	} else { // File error
-		cout << "File error when trying to read '" << filepath << "'\n";
+		throw runtime_error("File error when trying to read '" + filepath + "'\n");
 	}
 }
 

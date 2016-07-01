@@ -97,7 +97,7 @@ class NeuralNetwork {
 
 		double get_bias_weight(int, int) const;
 
-		double set_bias_weight(int, int, double);
+		void set_bias_weight(int, int, double);
 
 		// Helper functions
 

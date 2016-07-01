@@ -67,6 +67,8 @@ Neuron & Neuron::operator =(const Neuron & n) {
 		this->synapses[i] = synapses[i];
 		this->weights[i] = weights[i];
 	}
+
+        return *this;
 }
 
 bool Neuron::operator ==(const Neuron &n) {
@@ -417,7 +419,7 @@ void NeuralNetwork::set_weight(int i, int j, int k, double val) { this->get_neur
 
 double NeuralNetwork::get_bias_weight(int i, int j) const { return this->get_bias_neuron(i)->get_weight(j); }
 
-double NeuralNetwork::set_bias_weight(int i, int j, double val) { this->get_bias_neuron(i)->set_weight(j, val); }
+void NeuralNetwork::set_bias_weight(int i, int j, double val) { this->get_bias_neuron(i)->set_weight(j, val); }
 
 // Functionality
 
