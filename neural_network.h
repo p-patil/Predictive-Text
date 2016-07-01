@@ -2,6 +2,7 @@
 #define NEURAL_NETWORK_H
 
 #include <vector>
+#include <cstdarg>
 
 using namespace std;
 
@@ -144,6 +145,8 @@ class NeuralNetwork {
 		NeuralNetwork(int *, int);
 
 		NeuralNetwork(int *, double ***, double **, int);
+
+                NeuralNetwork(int, ...);
 
 		// Functionality
 

@@ -3,6 +3,7 @@
 #include <iterator>
 #include <algorithm>
 #include <iostream>
+#include <cstdarg>
 #include "neural_network.h"
 
 using namespace std;
@@ -173,6 +174,41 @@ NeuralNetwork::NeuralNetwork(int *layer_counts, double ***weights, double **bias
 
 		this->bias_neurons[i] = new BiasNeuron(this->layers[i + 1], bias_weights[i], layer_counts[i + 1]);
 	}
+}
+
+/* Variadic constructor that accepts an arbitrary number (at least 1) of arguments, the first of which specifies the number of layers
+ * with the rest specifying the number of neurons in the respective layers. */
+NeuralNetwork::NeuralNetwork(int num_layers, ...) {
+    va_list layer_counts;
+    va_start(layer_counts, num_layers);
+
+    /* Initialize. */
+    this->num_layers = num_layers;
+    this->layer_counts = new int[num_layers];
+    this->layers = new Neuron **[num_layers];
+    this->bias_neurons = new BiasNeuron *[num_layers - 1];
+
+    /* Copy layer counts over. */
+    for (int i = 0; i < num_layers; ++i) {
+        this->layer_counts[i] = va_arg(layer_counts, int); 
+    }
+
+    va_end(layer_counts);
+
+    /* Construct layers in backwards order, connecting synapses along the way. Start with output layer. */
+    this->layers[num_layers - 1] = new Neuron *[layer_counts[num_layers - 1]];
+    for (int i = 0; i < layer_counts[length - 1]; ++i) {
+        this->layers[num_layers - 1][i] = new OutputNeuron();
+    }
+
+    for (int i = num_layers - 2; i >= 0; --i) {
+        this->layers[i] = new Neuron *[layer_counts[i]];
+        for (int j = 0; j < layer_counts[i]; ++j) {
+                this->layers[i][j] = new Neuron(this->layers[i + 1], weights[i][j], layer_counts[i + 1]);
+        }
+
+        this->bias_neurons[i] = new BiasNeuron(this->layers[i + 1], bias_weights[i], layer_counts[i + 1]);
+    }
 }
 
 void NeuralNetwork::set_zero(ARRAY_2D &arr) {
