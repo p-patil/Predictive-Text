@@ -1,3 +1,5 @@
 *.out
 dirent.h
 .tags/*
+.idea/*
+CMakeLists.txt

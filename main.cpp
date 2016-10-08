@@ -35,8 +35,9 @@ using namespace std;
 					- http://gizmodo.com/swiftkey-has-a-neural-network-keyboard-and-its-creepily-1735430695
 					- https://blog.swiftkey.com/neural-networks-a-meaningful-leap-for-mobile-typing/
   Neural network TODO:
-    - Test on MNIST
+    - Parallelize, and look into GPU programming
     - Incorporate momentum, adaptive learning rate, weight decay
+        - Look into bold driver algorithm for momentum update, local learning rates
     - Learning optimal network topology
     - Look into hyperparameter turning (eg grid search)
     - Deep learning?
@@ -61,7 +62,7 @@ int main(int argc, char **argv) {
 	// 	}
 	// }
 
-        srand(time(NULL));
+    srand(time(NULL));
 	int sample_size = 1000;
 	vector<pair<ARRAY, ARRAY>> samples (sample_size);
 
@@ -88,7 +89,7 @@ int main(int argc, char **argv) {
 		y = sin(x);
 
 		yhat = net.feedforward(ARRAY(1, x))[0];
-                cout << "Error: " << abs(y - yhat) << " - expected " << y << ", got " << yhat << endl;
+        cout << "Error: " << abs(y - yhat) << " - expected " << y << ", got " << yhat << endl;
 	}
 	
 	return 0;
